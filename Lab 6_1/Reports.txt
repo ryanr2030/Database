@@ -1,0 +1,220 @@
+Create the database
+CREATE DATABASE FriendBook;
+
+
+CREATE TABLES:
+The following commands creates the UserInfo table that stores each user's information with primary key UserID.
+use FriendBook
+CREATE TABLE UserInfo (
+UserID varchar(20) not null,
+fname varchar (20) not null,
+lname varchar (20) not null,
+address varchar(30),
+email varchar(30),
+phoneNum float (10),
+password varchar(15)
+Constraint UserPK
+	primary key (UserID),
+);
+
+The following commands creates the FriendsList table that stores each user's friends. The primary key is the combination of
+the foreign key UserID and FriendID which in turn references another key in the UserInfo table.
+CREATE TABLE FriendsList(
+FriendID varchar (20) NOT NULL,
+UserID varchar (20),
+FriendLName varchar (20),
+Constraint FriendListPK
+	primary key (UserID, FriendID),
+Constraint UserIDFK
+	foreign key (UserID) References UserInfo(UserID) On delete cascade on UPDATE Cascade,
+Constraint FriendsListFK
+	foreign key (FriendID) References UserInfo(UserID)
+);
+
+The following commands and tables show the creation of the CRUDE procedures.
+
+The following commands creates the add procedure.
+Use FriendBook;
+--CREATE ADD PROCEDURE 
+Set ANSI_NULLS ON
+go
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE PROCEDURE SP_Add_UserInfo
+	(@UserID varchar(20),
+	@fname varchar (20),
+	@lname varchar (20) ,
+	@address varchar(30),
+	@email varchar(30),
+	@phoneNum float (10),
+	@password varchar(15))
+	AS
+	BEGIN
+	INSERT INTO UserInfo(UserID, fname, lname, address, email, phoneNum, password)
+	VALUES (@UserID, @fname, @lname, @address, @email, @phoneNum, @password)
+	SET @UserID = SCOPE_IDENTITY();
+	END 
+
+The following command creates an update procedure for the UserInfo Table.
+--CREATE UPDATE PROCEDURE USING PK	
+Set ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE PROCEDURE SP_Update_UserInfo
+	(@UserID varchar(20),
+	@fname varchar (20),
+	@lname varchar (20) ,
+	@address varchar(30),
+	@email varchar(30),
+	@phoneNum float (10),
+	@password varchar(15))
+	AS
+	BEGIN
+
+	UPDATE UserInfo
+	SET  fname=@fname, lname = @lname, address = @address, email = @email, phoneNum=@phoneNum, password=@password
+	WHERE UserID =@UserID;
+	END 
+
+The following commands creates a procedure that retieves all of the information within the UserInfo for a given user.
+
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+--Retieve User's Info from UserInfo Table
+CREATE PROCEDURE SP_Get_UserInfo(
+	@UserID		varchar(30))
+AS
+BEGIN
+	SELECT *
+	FROM UserInfo U
+	WHERE U.UserID = @UserID;
+END
+
+The following commands retieves a user's friends list.
+--Retrieve User's Friend's List
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE PROCEDURE SP_Get_FriendsList(
+	@UserID		varchar(30))
+AS
+BEGIN
+	SELECT U2.UserId AS FriendsId, U2.fFname, U2.lname, U2.phoneNum, U2.Email, U2.address
+	FROM FriendList F, UserInfo U, UserInfo U2
+	WHERE U.UserID = @UserID AND U.UserId = F.UserId AND F.FriendID = U2.UserID;
+END
+GO
+
+The following procedure adds a friend to the user's friends list. 
+--Add a Friend to Friend List
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE PROCEDURE SP_Add_Friend
+	@UserId		varchar(30),
+	@FriendID	varchar(30)
+
+AS
+BEGIN
+	INSERT INTO FriendsList (UserId, FriendID)
+	VALUES (@UserId, @FriendId);
+END
+GO
+
+
+The following commands creates a procedure to delete a friend from a user's friends list.
+--Delete a Friend from a user's friends list
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE PROCEDURE SP_Delete_Friend
+	@UserId		varchar(30),
+	@FriendId	varchar(30)
+AS
+BEGIN
+	DELETE FROM FriendsList
+	WHERE UserID = @UserID AND FriendID = @FriendID;
+END
+GO
+
+The following commands creates a procedure that deletes a user from the UserInfo table then deletes all entries for that user in the Friends lists table.
+--Delete a user from the UserInfo Table cascade deletes user from all friends lists
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE PROCEDURE SP_Delete_UserInfo
+	@UserId		varchar(30)
+AS
+BEGIN
+	DELETE FROM FriendsList
+	WHERE UserID = @UserID OR FriendID = @UserId;
+	DELETE FROM UserInfo 
+	WHERE UserID = @UserID;
+END
+GO
+
+
+The following commands populates the UserInfo table and shows the use of the Add user procedure.
+Use Friendbook
+INSERT INTO UserInfo(UserID, fname, lname, address, email, phoneNum, password) VALUES
+('ryanr2030', 'Ryan', 'Reynolds', '1234 Coventry Road', 'rreynold@csu.edu','2161234567', 'password'),
+('jdahl', 'Jessie', 'Dahlhausen', '9999 Hampshire', 'goldenretriever@ruff.com','2169876969', 'chalk'),
+('patty12', 'Patrick', 'Star', '120 Conch Street', 'patrickstart@bikkinibottom.net','6541112222', 'youllneverguess')
+;
+
+EXEC SP_Add_UserInfo @UserId='johnnyC', @fname='Johnny', @lname='Cruise', @address='1679 Lamberton road', @email='johnnyc@csu.edu', @phoneNum='4408889090', @password='help1';
+
+
+The following procedure populates the friends list and shows the execution of the Add Friend procedure.
+USE Friendbook
+INSERT INTO FriendsList( FriendID, UserID, FriendLName) VALUES
+('ryanr2030', 'jdahl', 'Reynolds'),
+('jdahl', 'ryanr2030', 'Dahlhausen'),
+('patty12', 'ryanr2030', 'Star');
+
+EXEC SP_Add_Friend @UserID='patty12', @FriendID='jdahl', @FriendLname='Star';
+
+The following commands show the UserInfo Table and the Friends List table.
+use Friendbook
+select * From UserInfo;
+select * From FriendsList;
+
+The following command gets the friends list of user jdahl and displays jdahl's information.
+Use FriendBook
+GO
+--Get Friends List of jdahl then get jdahl's information
+EXEC SP_Get_FriendsList @UserId = 'jdahl';
+EXEC SP_Get_UserInfo @UserId = 'jdahl';
+
+The following command updates jdahl's information then displays the information using the stored procedures.
+--Update jdahl's information then show the updated information
+EXEC SP_Update_UserInfo @UserId = 'jdahl', @fname='Jessica',  @lname='Smith', @address = '332 Somewhere with a Balcony Rd', 
+	@email = 'jdahl@gmail.com', @phoneNum = '1231231234', @password='chalk';
+EXEC SP_Get_UserInfo @UserId = 'jdahl';
+
+The following command deletes patrick starr from ryan reynolds' friends list then displays ryan's new friends list.
+--Delete the friend, Patrick Starr, patty12 from the user ryanr2030, Ryan Reynolds, friends list
+EXEC SP_Delete_Friend @UserId='ryanr2030', @FriendID='patty12';
+EXEC SP_Get_FriendsList @UserId = 'ryanr2030';
+
+The follwoing command deletes jdahl from the user table then deletes every instance of jdahl in the Friends list.
+the friends list is empty because the remaining values all contained jdahl.
+
+--Delete the User jdahl from the User's table showing the cascade deletion
+EXEC SP_Delete_UserInfo @UserId = 'jdahl';
+
+select * From UserInfo;
+select * From FriendsList;
+
+
+
+

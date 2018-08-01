@@ -1,0 +1,201 @@
+CIS 430
+Lab 6: Triggers
+Ryan Reynolds
+2693018
+Due: 5/1/18
+
+
+Part 1:
+
+Question 1: Drop all constraints
+The following commands drops all primary and foreign keys on the database.
+USE [Company]
+GO
+
+ALTER TABLE [dbo].[Employee] DROP CONSTRAINT [PK__Employee__CA1E8E3DA75D87B7] WITH ( ONLINE = OFF )
+ALTER TABLE [dbo].[Employee] DROP CONSTRAINT [FK__Employee__DNO__276EDEB3]
+ALTER TABLE [dbo].[Employee] DROP CONSTRAINT [FK__Employee__SuperS__267ABA7A]
+
+ALTER TABLE [dbo].[Department] DROP CONSTRAINT [PK__Departme__40A4CC7A619EB6FF] WITH ( ONLINE = OFF )
+ALTER TABLE [dbo].[Department] DROP CONSTRAINT [FK__Departmen__MgrSS__286302EC]
+ALTER TABLE [dbo].[Department] DROP CONSTRAINT [FK__Departmen__MgrSS__48CFD27E]
+ALTER TABLE [dbo].[Department] DROP CONSTRAINT [UQ__Departme__83BFD84946F629DC]
+
+
+ALTER TABLE [dbo].[Dependent] DROP CONSTRAINT [PK__Dependen__7E4E1C2DFC49894D] WITH ( ONLINE = OFF )
+ALTER TABLE [dbo].[Dependent] DROP CONSTRAINT [FK__Dependent__paren__2E1BDC42]
+
+
+ALTER TABLE [dbo].[Dept_Location] DROP CONSTRAINT [PK__Dept_Loc__ED088203B78A5F43] WITH ( ONLINE = OFF )
+ALTER TABLE [dbo].[Dept_Location] DROP CONSTRAINT [FK__Dept_Locati__DNO__2B3F6F97]
+
+
+ALTER TABLE [dbo].[Project] DROP CONSTRAINT [PK__Project__BBE761DD0227A3CA] WITH ( ONLINE = OFF )
+ALTER TABLE [dbo].[Project] DROP CONSTRAINT [FK__Project__Dnum__31EC6D26]
+ALTER TABLE [dbo].[Project] DROP CONSTRAINT [UQ__Project__173BB01CFEFD66BB]
+
+The following commands show the current state of the department and employee tables.
+use company
+select * from Department;
+select * from Employee;
+
+ALTER TABLE [dbo].[WORKS_ON] DROP CONSTRAINT [PK__WORKS_ON__B65F9BE817B4F933] WITH ( ONLINE = OFF )
+ALTER TABLE [dbo].[WORKS_ON] DROP CONSTRAINT [FK__WORKS_ON__Essn__34C8D9D1]
+ALTER TABLE [dbo].[WORKS_ON] DROP CONSTRAINT [FK__WORKS_ON__Pno__35BCFE0A]
+GO
+
+
+alter table Works_On
+Drop Constraint FK__WORKS_ON__Pno__6E01572D, FK__WORKS_ON__Pno__6EF57B66, FK__WORKS_ON__Pno__6FE99F9F;
+alter table Project
+DROP CONSTRAINT PK__Project__BBE761DD0227A3CA;
+
+Question 2:
+
+The following command creates the update trigger and shows its use.
+
+use company
+go
+Create Trigger EMPDEPTFK_UPDATE
+	ON Department
+	FOR UPDATE
+AS
+	IF UPDATE(Dnumber)
+Begin
+	Update Employee
+		set DNO=inserted.Dnumber
+			from Employee, deleted, inserted
+			where Employee.DNO = deleted.Dnumber
+			END
+GO
+Update Department SET DNUMBER = 99 WHERE Dnumber = 4;
+
+The following commands add the delete trigger and shows its use. All instances where Dnumber was set to 5 were deleted and reset to the default value of 1.
+
+Create Trigger EMPDEPTFK_DELETE
+	on department
+	for delete
+as
+	declare @default int
+	set @default = 1
+begin
+		Update Employee
+				set DNO=@default
+				From employee, deleted
+				where employee.DNO=deleted.Dnumber
+				END
+go
+Delete from department where Dnumber=5;
+
+The following commands drop both triggers.
+use company
+drop trigger EMPDEPTFK_UPDATE;
+drop trigger EMPDEPTFK_DELETE;
+
+Question 3: Create the stored Procedure SP_Audit_Dept that will insert all data changes for the department table.
+
+The following creates a table to store the changes to the department table in
+
+--Table used to record all changes to the department table
+Create Table Audit_Dept_Table(
+	date_of_change DATE NOT NULL,
+	old_Dname varchar(15) NOT NULL,
+	new_Dname varchar(15),
+	old_Dnumber INT NOT NULL,
+	new_Dnumber INT,
+	old_MgrSSN char(9) NOT NULL,
+	new_MgrSSN char(9)
+);
+
+The following commands create the audit procedure.
+Create Procedure SP_Audit_Dept(
+	@old_Dname VARCHAR (15),
+	@new_Dname VARCHAR (15),
+	@old_Dnumber int,
+	@new_Dnumber int, 
+	@old_MgrSSN CHAR(9),
+	@new_MgrSSN CHAR(9))
+	AS
+		declare @date_of_change DATE = GETDATE()
+	BEGIN
+		insert into Audit_dept_table Values(
+			@date_of_change, @old_Dname, @new_Dname, @old_Dnumber, @new_Dnumber, 
+			@old_MgrSSN, @new_MgrSSN);
+	END
+
+The following commands creates the update trigger for the department table.
+Create trigger EMPDEPTFK_UPDATE
+	on Department
+	for UPDATE
+AS
+	declare @old_Dname VARCHAR(15)
+	declare @old_Dnumber INT
+	declare @old_MgrSSN INT
+	declare @new_Dname VARCHAR(15)
+	declare @new_Dnumber INT
+	declare @new_MgrSSN INT
+BEGIN
+	if UPDATE(Dnumber)
+	UPDATE Employee
+		set DNO = inserted.Dnumber
+			From Employee, deleted, inserted
+			where employee.DNO = deleted.Dnumber
+	select @old_Dname = deleted.Dname,
+		   @old_dnumber = deleted.Dnumber,
+		   @old_MgrSSN=deleted.MgrSSN
+		
+	From deleted;
+	select @new_Dname = inserted.Dname,
+			@new_Dnumber = inserted.Dnumber,
+			@new_MgrSSN = inserted.MgrSSN
+	From inserted;
+
+	EXEC SP_Audit_Dept @old_Dname, @new_Dname, @old_Dnumber, @new_Dnumber, @old_MgrSSN,@new_MgrSSN;
+	END
+
+Thefollowing commands create the delete trigger.
+
+Create trigger EMPDEPTFK_DELETE
+	on department
+	for delete
+AS
+	declare @default int
+	declare @old_Dname varchar(15)
+	declare @old_Dnumber INT
+	declare @old_MgrSSN INT
+	set @default =1
+BEGIN
+	Update employee
+		set DNO=@default
+			from employee, deleted
+			where employee.DNO=deleted.Dnumber;
+	select @old_Dname=deleted.Dname,
+		   @old_Dnumber=deleted.Dnumber,
+		   @old_MgrSSN=deleted.MgrSSN
+	from deleted;
+
+	exec SP_audit_Dept @old_Dname, NULL, @old_Dnumber, NULL, @old_MgrSSN, NULL;
+END
+
+
+The following commands show the employee and department tables prior to performing updates.
+use company
+select * from Department;
+select * from Employee;
+
+The following command shows the excution of the update procedure.
+Update department set dname = 'Robotics' where dnumber = 99;
+
+
+The following command shows the updated department table and then the audit table logging the change. Dname is only an attribute of the department table so the employee table was not changed. 
+The administration table was correctly updated to robotics and the changed was correctly logged.
+use company 
+select * from Department;
+select * from Audit_Dept_Table;
+
+The following command tests the delete procedure and trigger.
+delete from department where Dnumber = 99;
+
+The following command shows the resultant tables after executing the trigger. The delete trigger fired 
+which is recorded in the Audit table. The deletion of the department set all employees orginally in the Administration (robotics)
+department to the default department, headquarters.
